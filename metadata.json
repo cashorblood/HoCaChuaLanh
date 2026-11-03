@@ -1,0 +1,6 @@
+{
+  "name": "Hồ Thủy Sinh Chữa Lành",
+  "description": "Không gian nuôi cá Betta & Guppy 3D thư giãn — tự tay thiết kế bố cục thủy sinh, cho cá ăn, thay nước và tận hưởng âm thanh chữa lành.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
