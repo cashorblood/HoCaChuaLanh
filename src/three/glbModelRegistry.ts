@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-export type GlbSlotId = 'betta' | 'guppy' | 'rock' | 'driftwood' | 'plant';
+export type GlbSlotId = 'betta' | 'guppy' | 'shrimp' | 'rock' | 'driftwood' | 'plant';
 
 export interface LoadedGlbEntry {
   slot: GlbSlotId;
@@ -14,6 +14,7 @@ export interface LoadedGlbEntry {
 const TARGET_DIMENSIONS: Record<GlbSlotId, { size: number; alignBottom: boolean }> = {
   betta: { size: 0.68, alignBottom: false },
   guppy: { size: 0.42, alignBottom: false },
+  shrimp: { size: 0.24, alignBottom: true },
   rock: { size: 0.92, alignBottom: true },
   driftwood: { size: 1.25, alignBottom: true },
   plant: { size: 0.95, alignBottom: true },

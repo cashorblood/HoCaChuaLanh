@@ -1,4 +1,4 @@
-export type FishSpecies = 'betta' | 'guppy';
+export type FishSpecies = 'betta' | 'guppy' | 'shrimp';
 
 export type BettaMorph =
   | 'betta_halfmoon_red'
@@ -12,7 +12,13 @@ export type GuppyMorph =
   | 'guppy_koi_redear'
   | 'guppy_dumbo_mosaic';
 
-export type FishMorphId = BettaMorph | GuppyMorph;
+export type ShrimpMorph =
+  | 'shrimp_red_cherry'
+  | 'shrimp_crystal_red'
+  | 'shrimp_blue_dream'
+  | 'shrimp_yellow_golden';
+
+export type FishMorphId = BettaMorph | GuppyMorph | ShrimpMorph;
 
 export interface FishCatalogItem {
   id: FishMorphId;
@@ -23,7 +29,7 @@ export interface FishCatalogItem {
   secondaryHex: string;
   finHex: string;
   accentHex: string;
-  pattern: 'solid' | 'koi' | 'gradient' | 'mosaic';
+  pattern: 'solid' | 'koi' | 'gradient' | 'mosaic' | 'shrimp_band' | 'shrimp_stripe';
 }
 
 export interface FishInstanceData {
@@ -187,6 +193,50 @@ export const FISH_CATALOG: FishCatalogItem[] = [
     accentHex: '#38bdf8',
     pattern: 'mosaic',
   },
+  {
+    id: 'shrimp_red_cherry',
+    species: 'shrimp',
+    name: 'Tép Đỏ Fire Red',
+    subtitle: 'Đỏ ruby rực rỡ, chăm chỉ nhặt rêu nền',
+    bodyHex: '#b91c1c',
+    secondaryHex: '#ef4444',
+    finHex: '#f87171',
+    accentHex: '#fecaca',
+    pattern: 'solid',
+  },
+  {
+    id: 'shrimp_crystal_red',
+    species: 'shrimp',
+    name: 'Tép Ong Đỏ (Crystal Red)',
+    subtitle: 'Khoang trắng sứ xen đỏ thẫm cao cấp',
+    bodyHex: '#f8fafc',
+    secondaryHex: '#dc2626',
+    finHex: '#fca5a5',
+    accentHex: '#ffffff',
+    pattern: 'shrimp_band',
+  },
+  {
+    id: 'shrimp_blue_dream',
+    species: 'shrimp',
+    name: 'Tép Xanh Blue Dream',
+    subtitle: 'Vỏ xanh ngọc bích trong vắt nổi bật trên cát',
+    bodyHex: '#1e40af',
+    secondaryHex: '#2563eb',
+    finHex: '#60a5fa',
+    accentHex: '#bae6fd',
+    pattern: 'gradient',
+  },
+  {
+    id: 'shrimp_yellow_golden',
+    species: 'shrimp',
+    name: 'Tép Vàng Sọc Lưng',
+    subtitle: 'Vàng chanh óng ánh điểm sọc lưng kim tuyến',
+    bodyHex: '#ca8a04',
+    secondaryHex: '#facc15',
+    finHex: '#fde047',
+    accentHex: '#fef9c3',
+    pattern: 'shrimp_stripe',
+  },
 ];
 
 export const PROP_CATALOG: PropCatalogItem[] = [
@@ -311,6 +361,27 @@ export const PRESET_LAYOUTS: Record<
         customName: 'Hoàng Kim 02',
         scale: 0.96,
       },
+      {
+        id: 'shrimp-nf-1',
+        morph: 'shrimp_red_cherry',
+        species: 'shrimp',
+        customName: 'Fire Red 01',
+        scale: 1.0,
+      },
+      {
+        id: 'shrimp-nf-2',
+        morph: 'shrimp_red_cherry',
+        species: 'shrimp',
+        customName: 'Fire Red 02',
+        scale: 0.94,
+      },
+      {
+        id: 'shrimp-nf-3',
+        morph: 'shrimp_yellow_golden',
+        species: 'shrimp',
+        customName: 'Golden Back 01',
+        scale: 0.98,
+      },
     ],
     props: [
       { id: 'p-1', type: 'bonsai_driftwood', x: -0.75, z: -0.1, rotationY: 0.35, scale: 1.15 },
@@ -383,6 +454,27 @@ export const PRESET_LAYOUTS: Record<
         species: 'guppy',
         customName: 'Hồng Đầu 03',
         scale: 0.9,
+      },
+      {
+        id: 'iw-shrimp-1',
+        morph: 'shrimp_crystal_red',
+        species: 'shrimp',
+        customName: 'Tép Ong PRL 01',
+        scale: 1.02,
+      },
+      {
+        id: 'iw-shrimp-2',
+        morph: 'shrimp_crystal_red',
+        species: 'shrimp',
+        customName: 'Tép Ong PRL 02',
+        scale: 0.95,
+      },
+      {
+        id: 'iw-shrimp-3',
+        morph: 'shrimp_blue_dream',
+        species: 'shrimp',
+        customName: 'Blue Dream 01',
+        scale: 0.98,
       },
     ],
     props: [

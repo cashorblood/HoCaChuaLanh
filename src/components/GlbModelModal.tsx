@@ -27,6 +27,12 @@ const SLOT_CONFIGS: Array<{
     suggestedFile: 'guppy.glb',
   },
   {
+    slot: 'shrimp',
+    title: 'Tép Cảnh (Fire Red / Tép Ong / Blue Dream)',
+    subtitle: 'Áp dụng cho đàn tép cảnh bò nhặt rêu dưới nền cát & rêu',
+    suggestedFile: 'shrimp.glb',
+  },
+  {
     slot: 'rock',
     title: 'Đá Thủy Sinh (Seiryu / Ryuoh)',
     subtitle: 'Thay thế hình khối các cụm đá lớn & đá dăm trên nền bể',
@@ -89,25 +95,25 @@ export function GlbModelModal({ open, onClose, onNotify }: GlbModelModalProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Quản lý mô hình 3D GLB chân thực"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl max-h-[88vh] overflow-y-auto bg-[#0d1619] border border-white/12 rounded-2xl shadow-2xl p-5 text-stone-100"
+        className="w-full max-w-2xl max-h-[88dvh] overflow-y-auto overscroll-contain custom-scrollbar bg-[#0d1619] border border-white/12 rounded-2xl shadow-2xl p-4 sm:p-5 text-stone-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 pb-4 border-b border-white/10">
-          <div className="flex items-start gap-3">
-            <div className="p-2.5 rounded-xl bg-teal-950/80 border border-teal-400/30 text-teal-300 shrink-0">
-              <Box className="w-5 h-5" />
+        <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-white/10">
+          <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-teal-950/80 border border-teal-400/30 text-teal-300 shrink-0">
+              <Box className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-base font-semibold text-stone-100">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-semibold text-stone-100">
                 Xưởng Mô Hình 3D Chân Thực (.GLB / PBR)
               </h2>
               <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">
-                Hồ đã được nâng cấp sẵn vân đá Seiryu, vỏ lũa, cát suối PBR, nắng xuyên nước & Bloom quang học. Bạn có thể nạp thêm file <strong>.glb</strong> điêu khắc chi tiết cho từng vật thể bên dưới.
+                Hồ đã được nâng cấp sẵn vân đá Seiryu, vỏ lũa, cát suối PBR, nắng xuyên nước & Bloom quang học. Bạn có thể nạp thêm file <strong>.glb</strong> điêu khắc chi tiết bên dưới.
               </p>
             </div>
           </div>
@@ -122,30 +128,30 @@ export function GlbModelModal({ open, onClose, onNotify }: GlbModelModalProps) {
         </div>
 
         {/* Mode Switcher: Live Upload vs Permanent GitHub Hosting Guide */}
-        <div className="flex items-center justify-between gap-2 my-3.5">
-          <div className="flex items-center gap-1.5 p-1 bg-[#070d0f] rounded-xl border border-white/8">
+        <div className="flex items-center justify-between gap-2 my-3">
+          <div className="flex items-center gap-1 p-1 bg-[#070d0f] rounded-xl border border-white/8 overflow-x-auto no-scrollbar max-w-full">
             <button
               type="button"
               onClick={() => setShowGithubGuide(false)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 !showGithubGuide
                   ? 'bg-teal-400 text-stone-950 font-semibold'
                   : 'text-stone-300 hover:text-stone-100'
               }`}
             >
-              Nạp thử trực tiếp từ máy (.glb)
+              Nạp thử từ máy (.glb)
             </button>
             <button
               type="button"
               onClick={() => setShowGithubGuide(true)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 showGithubGuide
                   ? 'bg-teal-400 text-stone-950 font-semibold'
                   : 'text-stone-300 hover:text-stone-100'
               }`}
             >
               <FolderGit2 className="w-3.5 h-3.5" />
-              <span>Cách lưu cố định lên GitHub Pages</span>
+              <span>Lưu cố định lên GitHub</span>
             </button>
           </div>
 
@@ -248,6 +254,7 @@ export function GlbModelModal({ open, onClose, onNotify }: GlbModelModalProps) {
   "models": {
     "betta": "./models/betta.glb",
     "guppy": "./models/guppy.glb",
+    "shrimp": "./models/shrimp.glb",
     "rock": "./models/rock.glb",
     "driftwood": "./models/driftwood.glb",
     "plant": "./models/plant.glb"

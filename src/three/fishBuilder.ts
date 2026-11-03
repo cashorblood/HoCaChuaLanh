@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { FISH_CATALOG, FishCatalogItem, FishInstanceData } from '../types/aquarium';
-import { createFinSilkTexture, createFishBodyTexture } from './proceduralTextures';
+import {
+  createFinSilkTexture,
+  createFishBodyTexture,
+  createShrimpShellTexture,
+} from './proceduralTextures';
 import { groundHeightAt, TANK_DEPTH, TANK_WIDTH } from './aquascapeBuilder';
 import { glbRegistry } from './glbModelRegistry';
 
@@ -101,6 +105,9 @@ export function createFishAgent(
   waterLevel: number
 ): FishAgent {
   const spec = FISH_CATALOG.find((c) => c.id === data.morph) || FISH_CATALOG[0];
+  if (data.species === 'shrimp') {
+    return createShrimpAgent(data, spec, maxAnisotropy);
+  }
   const isBetta = data.species === 'betta';
   const isDumbo = data.morph.includes('dumbo');
 
@@ -359,6 +366,241 @@ export function createFishAgent(
   };
 }
 
+/**
+ * Builds an articulated 3D ornamental dwarf shrimp (Neocaridina / Caridina)
+ * with curved translucent chitin carapace, uropod tail fan, stalked eyes,
+ * 4 sweeping antennae whiskers, and animated grazing legs.
+ */
+function createShrimpAgent(
+  data: FishInstanceData,
+  spec: FishCatalogItem,
+  maxAnisotropy: number
+): FishAgent {
+  const swimUniform = { value: Math.random() * 10 };
+  const speedUniform = { value: 0.4 };
+
+  const startX = (Math.random() - 0.5) * 3.1;
+  const startZ = (Math.random() - 0.5) * 1.45;
+  const startY = groundHeightAt(startX, startZ) + 0.038;
+  const startPos = new THREE.Vector3(startX, startY, startZ);
+
+  const customGlb = glbRegistry.instantiateSlot('shrimp');
+  if (customGlb) {
+    const root = new THREE.Group();
+    root.name = `shrimp-${data.id}`;
+    root.add(customGlb.root);
+    root.scale.setScalar(data.scale);
+    root.position.copy(startPos);
+    return {
+      id: data.id,
+      data,
+      spec,
+      root,
+      mixer: customGlb.mixer,
+      gillLeft: null,
+      gillRight: null,
+      pectoralLeft: null,
+      pectoralRight: null,
+      tailMesh: null,
+      dorsalMesh: null,
+      swimUniform,
+      speedUniform,
+      position: startPos,
+      velocity: new THREE.Vector3((Math.random() - 0.5) * 0.15, 0, (Math.random() - 0.5) * 0.15),
+      target: startPos.clone(),
+      retargetTimer: Math.random() * 2,
+      flareFactor: 0,
+      phaseOffset: Math.random() * Math.PI * 2,
+    };
+  }
+
+  const root = new THREE.Group();
+  root.name = `shrimp-${data.id}`;
+
+  const shellTex = createShrimpShellTexture(spec, maxAnisotropy);
+  const shellMat = new THREE.MeshPhysicalMaterial({
+    map: shellTex,
+    roughness: 0.16,
+    metalness: 0.04,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.08,
+    transparent: true,
+    opacity: spec.pattern === 'shrimp_band' ? 0.97 : 0.9,
+    sheen: 0.35,
+    sheenColor: new THREE.Color(spec.accentHex),
+  });
+
+  // Curved shrimp body spine from tail tip (-Z) over arched saddle to rostrum (+Z)
+  const bodyProfile: THREE.Vector2[] = [
+    new THREE.Vector2(0.002, -0.095),
+    new THREE.Vector2(0.009, -0.078),
+    new THREE.Vector2(0.015, -0.052),
+    new THREE.Vector2(0.021, -0.022),
+    new THREE.Vector2(0.025, 0.01),
+    new THREE.Vector2(0.026, 0.042),
+    new THREE.Vector2(0.021, 0.068),
+    new THREE.Vector2(0.011, 0.086),
+    new THREE.Vector2(0.002, 0.102),
+  ];
+  const carapaceGeo = new THREE.LatheGeometry(bodyProfile, 20);
+  carapaceGeo.rotateX(Math.PI * 0.5);
+  // Arch dorsal back upward slightly like a natural Caridina shrimp posture
+  const cPos = carapaceGeo.attributes.position;
+  for (let i = 0; i < cPos.count; i++) {
+    const z = cPos.getZ(i);
+    const x = cPos.getX(i);
+    const y = cPos.getY(i);
+    const arch = Math.cos(z * 14.5) * 0.011 - (z < -0.03 ? (z + 0.03) * 0.18 : 0);
+    cPos.setXYZ(i, x * 0.78, y * 1.08 + arch, z);
+  }
+  carapaceGeo.computeVertexNormals();
+
+  // Gentle abdominal tail-flick shader
+  shellMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uSwimPhase = swimUniform;
+    shader.uniforms.uSwimSpeed = speedUniform;
+    shader.vertexShader =
+      `uniform float uSwimPhase;\nuniform float uSwimSpeed;\n` +
+      shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+        float tailMask = clamp((0.02 - position.z) * 8.5, 0.0, 1.0);
+        transformed.y += sin(uSwimPhase * 7.5 - tailMask * 2.5) * tailMask * 0.007 * uSwimSpeed;
+        `
+      );
+  };
+
+  const carapaceMesh = new THREE.Mesh(carapaceGeo, shellMat);
+  carapaceMesh.position.y = 0.012;
+  carapaceMesh.castShadow = true;
+  root.add(carapaceMesh);
+
+  // Horizontal Uropod Tail Fan (5-blade translucent fan at -Z)
+  const tailFanMat = new THREE.MeshPhysicalMaterial({
+    color: spec.finHex,
+    roughness: 0.25,
+    transparent: true,
+    opacity: 0.78,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const tailFanGeo = new THREE.CircleGeometry(0.036, 12, Math.PI * 0.22, Math.PI * 0.56);
+  tailFanGeo.rotateX(-Math.PI * 0.5);
+  tailFanGeo.rotateY(Math.PI);
+  const tailFanMesh = new THREE.Mesh(tailFanGeo, tailFanMat);
+  tailFanMesh.position.set(0, 0.008, -0.084);
+  tailFanMesh.rotation.x = -0.24;
+  root.add(tailFanMesh);
+
+  // Stalked Beady Glossy Black Eyes
+  const eyeMat = new THREE.MeshPhysicalMaterial({
+    color: 0x05070c,
+    roughness: 0.05,
+    clearcoat: 1.0,
+  });
+  [-1, 1].forEach((side) => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.0065, 8, 8), eyeMat);
+    eye.position.set(side * 0.014, 0.021, 0.072);
+    root.add(eye);
+  });
+
+  // 4 Delicate Whiskers / Antennae (2 long swept back, 2 short forward feelers)
+  const whiskerMat = new THREE.MeshStandardMaterial({
+    color: spec.accentHex,
+    roughness: 0.35,
+    transparent: true,
+    opacity: 0.72,
+  });
+  [-1, 1].forEach((side) => {
+    const longCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(side * 0.007, 0.019, 0.086),
+      new THREE.Vector3(side * 0.038, 0.042, 0.065),
+      new THREE.Vector3(side * 0.055, 0.048, -0.015),
+      new THREE.Vector3(side * 0.048, 0.036, -0.095),
+    ]);
+    const longWhisker = new THREE.Mesh(
+      new THREE.TubeGeometry(longCurve, 10, 0.0014, 4, false),
+      whiskerMat
+    );
+    root.add(longWhisker);
+
+    const feelerCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(side * 0.005, 0.016, 0.088),
+      new THREE.Vector3(side * 0.018, 0.015, 0.128),
+      new THREE.Vector3(side * 0.026, 0.008, 0.155),
+    ]);
+    const feeler = new THREE.Mesh(
+      new THREE.TubeGeometry(feelerCurve, 6, 0.0012, 4, false),
+      whiskerMat
+    );
+    root.add(feeler);
+  });
+
+  // Scuttling Walking Legs (Pereiopods) & Grazing Claws underneath
+  const legMat = new THREE.MeshStandardMaterial({
+    color: spec.secondaryHex,
+    roughness: 0.4,
+    transparent: true,
+    opacity: 0.85,
+  });
+  legMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uSwimPhase = swimUniform;
+    shader.uniforms.uSwimSpeed = speedUniform;
+    shader.vertexShader =
+      `uniform float uSwimPhase;\nuniform float uSwimSpeed;\n` +
+      shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+        float legTip = clamp(-position.y * 28.0, 0.0, 1.0);
+        transformed.z += sin(uSwimPhase * 16.0 + position.z * 70.0 + position.x * 40.0) * legTip * 0.009 * (0.35 + uSwimSpeed);
+        `
+      );
+  };
+
+  const legsMergedGroup = new THREE.Group();
+  const legZOffsets = [0.058, 0.038, 0.018, -0.004, -0.026];
+  for (const lz of legZOffsets) {
+    [-1, 1].forEach((side) => {
+      const legGeo = new THREE.CylinderGeometry(0.0018, 0.001, 0.034, 4);
+      legGeo.translate(0, -0.016, 0);
+      legGeo.rotateZ(side * 0.42);
+      legGeo.rotateX(lz > 0.03 ? 0.25 : -0.12);
+      const leg = new THREE.Mesh(legGeo, legMat);
+      leg.position.set(side * 0.011, 0.004, lz);
+      legsMergedGroup.add(leg);
+    });
+  }
+  root.add(legsMergedGroup);
+
+  // Scale ~1.35x natural dwarf shrimp visibility so users can admire bands & antennae clearly
+  root.scale.setScalar(data.scale * 1.38);
+  root.position.copy(startPos);
+
+  return {
+    id: data.id,
+    data,
+    spec,
+    root,
+    mixer: null,
+    gillLeft: null,
+    gillRight: null,
+    pectoralLeft: null,
+    pectoralRight: null,
+    tailMesh: tailFanMesh,
+    dorsalMesh: null,
+    swimUniform,
+    speedUniform,
+    position: startPos,
+    velocity: new THREE.Vector3((Math.random() - 0.5) * 0.12, 0, (Math.random() - 0.5) * 0.12),
+    target: startPos.clone(),
+    retargetTimer: Math.random() * 2,
+    flareFactor: 0,
+    phaseOffset: Math.random() * Math.PI * 2,
+  };
+}
+
 function createRibbonVentralGeometry(width: number, length: number): THREE.BufferGeometry {
   const geo = new THREE.PlaneGeometry(width, length, 2, 6);
   geo.translate(0, -length * 0.5, 0);
@@ -475,8 +717,117 @@ export function updateFishAgents(
   for (let i = 0; i < agents.length; i++) {
     const agent = agents[i];
     const isBetta = agent.data.species === 'betta';
+    const isShrimp = agent.data.species === 'shrimp';
     agent.retargetTimer -= dt;
 
+    // =========================================================================
+    // DWARF SHRIMP BEHAVIOR: Substrate/Moss Grazing + Sunken Pellet Nibbling + Swim-Hops
+    // =========================================================================
+    if (isShrimp) {
+      let chasingSunkenFood = false;
+      let nearestDist = 999;
+      let nearestPellet: FoodPellet | null = null;
+
+      for (let p = 0; p < pellets.length; p++) {
+        const pel = pellets[p];
+        if (pel.eaten) continue;
+        const pFloor = groundHeightAt(pel.position.x, pel.position.z) + 0.35;
+        if (pel.position.y > pFloor) continue; // Wait until food drifts closer to bottom
+        const d = agent.position.distanceTo(pel.position);
+        if (d < nearestDist && d < 1.8) {
+          nearestDist = d;
+          nearestPellet = pel;
+        }
+      }
+
+      if (nearestPellet) {
+        chasingSunkenFood = true;
+        const pf = groundHeightAt(nearestPellet.position.x, nearestPellet.position.z) + 0.038;
+        agent.target.set(nearestPellet.position.x, pf, nearestPellet.position.z);
+        if (nearestDist < 0.14) {
+          nearestPellet.eaten = true;
+        }
+      } else if (agent.retargetTimer <= 0) {
+        const doSwimHop = Math.random() < 0.22;
+        agent.retargetTimer = doSwimHop ? 1.8 + Math.random() * 1.5 : 2.8 + Math.random() * 4.2;
+        const stepRadius = doSwimHop ? 1.35 : 0.55;
+        const tx = THREE.MathUtils.clamp(
+          agent.position.x + (Math.random() - 0.5) * stepRadius * 2,
+          -halfW,
+          halfW
+        );
+        const tz = THREE.MathUtils.clamp(
+          agent.position.z + (Math.random() - 0.5) * stepRadius * 1.5,
+          -halfD,
+          halfD
+        );
+        const baseFloor = groundHeightAt(tx, tz) + 0.038;
+        // Either crawl right along substrate/rock base or do a graceful shrimp hop arc
+        const ty = doSwimHop ? baseFloor + 0.22 + Math.random() * 0.38 : baseFloor;
+        agent.target.set(tx, ty, tz);
+      }
+
+      _steer.copy(agent.target).sub(agent.position);
+      const dist = _steer.length();
+      const isHopping = agent.target.y > groundHeightAt(agent.target.x, agent.target.z) + 0.12;
+      const maxShrimpSpeed = chasingSunkenFood ? 0.42 : isHopping ? 0.52 : 0.18;
+
+      if (dist > 0.02) {
+        _steer.normalize().multiplyScalar(dist < 0.22 ? maxShrimpSpeed * (dist / 0.22) : maxShrimpSpeed);
+      } else {
+        _steer.set(0, 0, 0);
+        // Settled after a hop -> sink softly onto substrate
+        const settleFloor = groundHeightAt(agent.position.x, agent.position.z) + 0.038;
+        if (agent.position.y > settleFloor + 0.01) {
+          _steer.y = -0.22;
+        }
+      }
+
+      // Gentle spacing between shrimp
+      for (let j = 0; j < agents.length; j++) {
+        if (i === j || agents[j].data.species !== 'shrimp') continue;
+        const d = agent.position.distanceTo(agents[j].position);
+        if (d < 0.16 && d > 0.001) {
+          _diff.copy(agent.position).sub(agents[j].position).normalize().multiplyScalar(0.14);
+          _steer.add(_diff);
+        }
+      }
+
+      agent.velocity.x = THREE.MathUtils.damp(agent.velocity.x, _steer.x, 4.5, dt);
+      agent.velocity.y = THREE.MathUtils.damp(agent.velocity.y, _steer.y, 4.0, dt);
+      agent.velocity.z = THREE.MathUtils.damp(agent.velocity.z, _steer.z, 4.5, dt);
+      agent.position.addScaledVector(agent.velocity, dt);
+
+      const minShrimpY = groundHeightAt(agent.position.x, agent.position.z) + 0.036;
+      agent.position.x = THREE.MathUtils.clamp(agent.position.x, -halfW, halfW);
+      agent.position.z = THREE.MathUtils.clamp(agent.position.z, -halfD, halfD);
+      agent.position.y = THREE.MathUtils.clamp(agent.position.y, minShrimpY, maxY - 0.25);
+
+      agent.root.position.copy(agent.position);
+
+      const horizSpeed = Math.hypot(agent.velocity.x, agent.velocity.z);
+      if (horizSpeed > 0.015) {
+        _desiredDir.copy(agent.velocity);
+        _desiredDir.y = THREE.MathUtils.clamp(_desiredDir.y, -0.28, 0.35);
+        _desiredDir.normalize();
+        _lookMat.lookAt(_desiredDir, _zeroVec, _upVec);
+        _quatTarget.setFromRotationMatrix(_lookMat);
+        agent.root.quaternion.slerp(_quatTarget, 1 - Math.exp(-6.0 * dt));
+      }
+
+      if (agent.mixer) {
+        agent.mixer.timeScale = 0.6 + horizSpeed * 2.2;
+        agent.mixer.update(dt);
+      }
+
+      agent.speedUniform.value = THREE.MathUtils.clamp(horizSpeed / 0.35, 0.25, 1.3);
+      agent.swimUniform.value += dt * (1.5 + horizSpeed * 5.0);
+      continue;
+    }
+
+    // =========================================================================
+    // BETTA & GUPPY SWIMMING BEHAVIOR
+    // =========================================================================
     let chasingFood = false;
     let nearestFoodDist = 999;
     let nearestPellet: FoodPellet | null = null;
@@ -548,7 +899,7 @@ export function updateFishAgents(
       _schoolVel.set(0, 0, 0);
 
       for (let j = 0; j < agents.length; j++) {
-        if (i === j) continue;
+        if (i === j || agents[j].data.species === 'shrimp') continue;
         const other = agents[j];
         const d = agent.position.distanceTo(other.position);
         if (d < 0.32 && d > 0.001) {
@@ -568,7 +919,7 @@ export function updateFishAgents(
       }
     } else if (isBetta) {
       for (let j = 0; j < agents.length; j++) {
-        if (i === j) continue;
+        if (i === j || agents[j].data.species === 'shrimp') continue;
         const d = agent.position.distanceTo(agents[j].position);
         if (d < 0.48 && d > 0.001) {
           _diff.copy(agent.position).sub(agents[j].position).normalize().multiplyScalar(0.45);

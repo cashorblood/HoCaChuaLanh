@@ -2,7 +2,10 @@ node_modules/
 build/
 dist/
 coverage/
+.vite/
+*.tsbuildinfo
 .DS_Store
 *.log
 .env*
 !.env.example
+public/assets/aistudio/

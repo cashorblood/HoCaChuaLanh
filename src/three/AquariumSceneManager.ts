@@ -239,6 +239,8 @@ export class AquariumSceneManager {
   private tapTimer = 0;
 
   private activeCamTransition: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
+  private currentCameraPreset: CameraPreset = 'front';
+  private dockVisible = true;
 
   constructor(container: HTMLElement, initialState: AquariumState, callbacks: SceneCallbacks) {
     this.container = container;
@@ -255,8 +257,9 @@ export class AquariumSceneManager {
       return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
     })();
 
-    const width = container.clientWidth || window.innerWidth;
-    const height = container.clientHeight || window.innerHeight;
+    const width = Math.max(1, container.clientWidth || window.innerWidth);
+    const height = Math.max(1, container.clientHeight || window.innerHeight);
+    const isCompactScreen = Math.min(width, height) < 600;
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: !this.isSoftwareGl,
@@ -265,24 +268,29 @@ export class AquariumSceneManager {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.06;
-    this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(
+      this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, isCompactScreen ? 1.6 : 2)
+    );
     this.renderer.setSize(width, height);
     this.renderer.shadowMap.enabled = !this.isSoftwareGl;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.domElement.style.display = 'block';
+    this.renderer.domElement.style.width = '100%';
+    this.renderer.domElement.style.height = '100%';
+    this.renderer.domElement.style.touchAction = 'none';
     container.appendChild(this.renderer.domElement);
 
     this.maxAnisotropy = this.renderer.capabilities.getMaxAnisotropy();
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x091013);
-    this.scene.fog = new THREE.FogExp2(0x091013, 0.042);
+    this.scene.fog = new THREE.FogExp2(0x091013, 0.036);
 
     const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
     pmremGenerator.dispose();
 
-    this.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 60);
-    this.camera.position.set(0, 1.55, 5.65);
+    this.camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 80);
 
     // Cinematic Post-Processing Pipeline (Hardware GPUs only)
     if (!this.isSoftwareGl) {
@@ -301,15 +309,20 @@ export class AquariumSceneManager {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = !this.isSoftwareGl;
     this.controls.dampingFactor = 0.06;
-    this.controls.target.set(0, 1.15, 0);
-    this.controls.minDistance = 2.4;
-    this.controls.maxDistance = 9.5;
+    this.controls.minDistance = 2.2;
+    this.controls.maxDistance = 19.5;
     this.controls.minPolarAngle = 0.08;
     this.controls.maxPolarAngle = Math.PI * 0.495;
     this.controls.enablePan = false;
     this.controls.addEventListener('start', () => {
       this.activeCamTransition = null;
     });
+
+    const initialFraming = this.computeResponsiveCameraFraming('front', width, height);
+    this.camera.position.copy(initialFraming.pos);
+    this.controls.target.copy(initialFraming.target);
+    this.controls.update();
+    this.updateFogForViewport(width, height);
 
     this.sharedPropAssets = {
       stoneTexture: createSeiryuStoneTexture(this.maxAnisotropy),
@@ -1063,12 +1076,64 @@ export class AquariumSceneManager {
     this.clickFeedMode = enabled;
   }
 
-  public setCameraPreset(preset: CameraPreset): void {
+  private updateFogForViewport(width: number, height: number): void {
+    const aspect = Math.max(0.35, width / Math.max(1, height));
+    const pullBack = aspect < 1.35 ? Math.min(2.85, 1.35 / aspect) : 1.0;
+    if (this.scene.fog instanceof THREE.FogExp2) {
+      this.scene.fog.density = 0.038 / pullBack;
+    }
+  }
+
+  private computeResponsiveCameraFraming(
+    preset: CameraPreset,
+    width?: number,
+    height?: number
+  ): { pos: THREE.Vector3; target: THREE.Vector3 } {
+    const w = Math.max(1, width ?? (this.container.clientWidth || window.innerWidth));
+    const h = Math.max(1, height ?? (this.container.clientHeight || window.innerHeight));
+    const aspect = Math.max(0.34, w / h);
+
     const spec = CAMERA_TARGETS[preset];
-    this.activeCamTransition = {
-      pos: new THREE.Vector3(...spec.pos),
-      target: new THREE.Vector3(...spec.target),
-    };
+    const baseTarget = new THREE.Vector3(...spec.target);
+    const basePos = new THREE.Vector3(...spec.pos);
+    const offset = basePos.clone().sub(baseTarget);
+
+    // Pull camera back proportionally when viewport is portrait or narrowed on PC
+    // so horizontal FOV always fits the entire 4.6m rimless tank edge-to-edge.
+    const refAspect = preset === 'closeup' ? 1.05 : 1.36;
+    const narrowScale = aspect < refAspect ? Math.min(2.85, refAspect / aspect) : 1.0;
+    const shortHeightScale = h < 580 ? Math.min(1.32, 580 / Math.max(h, 360)) : 1.0;
+    const distScale = Math.max(narrowScale, shortHeightScale);
+
+    offset.multiplyScalar(distScale);
+
+    // Lift the tank slightly into the upper open area when BottomDock is visible on compact screens
+    let targetYShift = 0;
+    if (this.dockVisible && preset !== 'top') {
+      if (aspect < 0.85) {
+        targetYShift = -0.68 * Math.min(1.45, 0.85 / aspect);
+      } else if (w < 1024 || h < 720) {
+        targetYShift = -0.26;
+      }
+    }
+
+    const framedTarget = baseTarget.clone();
+    framedTarget.y += targetYShift;
+
+    const framedPos = framedTarget.clone().add(offset);
+    return { pos: framedPos, target: framedTarget };
+  }
+
+  public setDockCollapsed(collapsed: boolean): void {
+    const nextVisible = !collapsed;
+    if (this.dockVisible === nextVisible) return;
+    this.dockVisible = nextVisible;
+    this.activeCamTransition = this.computeResponsiveCameraFraming(this.currentCameraPreset);
+  }
+
+  public setCameraPreset(preset: CameraPreset): void {
+    this.currentCameraPreset = preset;
+    this.activeCamTransition = this.computeResponsiveCameraFraming(preset);
   }
 
   public dropFood(foodType: FoodType, worldX?: number, worldZ?: number): void {
@@ -1309,10 +1374,21 @@ export class AquariumSceneManager {
       }
     };
 
+    let lastWidth = this.container.clientWidth || window.innerWidth;
+    let lastHeight = this.container.clientHeight || window.innerHeight;
+
     const onResize = () => {
       if (this.disposed) return;
-      const w = this.container.clientWidth || window.innerWidth;
-      const h = this.container.clientHeight || window.innerHeight;
+      const w = Math.max(1, this.container.clientWidth || window.innerWidth);
+      const h = Math.max(1, this.container.clientHeight || window.innerHeight);
+      if (w === lastWidth && h === lastHeight) return;
+      lastWidth = w;
+      lastHeight = h;
+
+      const compact = Math.min(w, h) < 600;
+      this.renderer.setPixelRatio(
+        this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, compact ? 1.6 : 2)
+      );
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
@@ -1322,18 +1398,31 @@ export class AquariumSceneManager {
       if (this.bloomPass) {
         this.bloomPass.resolution.set(w * 0.5, h * 0.5);
       }
+      this.updateFogForViewport(w, h);
+      this.activeCamTransition = this.computeResponsiveCameraFraming(
+        this.currentCameraPreset,
+        w,
+        h
+      );
     };
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => onResize()) : null;
+    resizeObserver?.observe(this.container);
 
     dom.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
 
     this.cleanupDomListeners = () => {
+      resizeObserver?.disconnect();
       dom.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
     };
   }
 

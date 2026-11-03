@@ -301,3 +301,61 @@ export function createFinSilkTexture(
 
   return finalizeColorTexture(canvas, maxAnisotropy, 1, 1);
 }
+
+/**
+ * Generates glossy chitin carapace textures for Neocaridina & Caridina dwarf shrimp
+ * (Crystal Red PRL alternating bands, Golden Back dorsal stripe, Fire Red & Blue Dream).
+ */
+export function createShrimpShellTexture(
+  spec: FishCatalogItem,
+  maxAnisotropy: number
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+
+  if (spec.pattern === 'shrimp_band') {
+    // Crisp porcelain white base with 4 crimson Caridina bee bands along length (x axis)
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, 256, 128);
+
+    const bands = [
+      { x: 0, w: 38 },
+      { x: 74, w: 36 },
+      { x: 146, w: 34 },
+      { x: 214, w: 42 },
+    ];
+    ctx.fillStyle = spec.secondaryHex;
+    for (const b of bands) {
+      ctx.fillRect(b.x, 0, b.w, 128);
+    }
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0, spec.bodyHex);
+    grad.addColorStop(0.55, spec.secondaryHex);
+    grad.addColorStop(1, spec.finHex);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 128);
+
+    if (spec.pattern === 'shrimp_stripe') {
+      // Bright golden-cream dorsal racing stripe along top ridge (y near 0 and 128 in Lathe UV)
+      ctx.fillStyle = spec.accentHex;
+      ctx.fillRect(0, 0, 256, 22);
+      ctx.fillRect(0, 106, 256, 22);
+    }
+  }
+
+  // Subtle chitin segment seam lines
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+  ctx.lineWidth = 1.5;
+  for (let x = 36; x < 230; x += 34) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 128);
+    ctx.stroke();
+  }
+
+  return finalizeColorTexture(canvas, maxAnisotropy, 1, 1);
+}
+

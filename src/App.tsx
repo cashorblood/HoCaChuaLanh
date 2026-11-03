@@ -26,8 +26,30 @@ import { zenAudio } from './utils/audioEngine';
 
 const STORAGE_KEY = 'ho_thuy_sinh_chua_lanh_v1';
 
+function parseSharedTankFromHash(): AquariumState | null {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash || '';
+  if (!hash.startsWith('#tank=')) return null;
+  const raw = hash.slice(6).trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(atob(raw))) as AquariumState;
+    if (parsed && Array.isArray(parsed.fishes) && Array.isArray(parsed.props)) {
+      return { ...parsed, mirrorActive: false };
+    }
+  } catch {
+    // Ignore malformed hash
+  }
+  return null;
+}
+
 function buildInitialState(): AquariumState {
   if (typeof window !== 'undefined') {
+    const sharedFromUrl = parseSharedTankFromHash();
+    if (sharedFromUrl) {
+      return sharedFromUrl;
+    }
+
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -97,6 +119,15 @@ export default function App() {
     const t = window.setTimeout(() => setToastMessage(null), 2800);
     return () => window.clearTimeout(t);
   }, [toastMessage]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#tank=')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      setToastMessage(
+        'Đang xem bể được chia sẻ! Bạn có thể chỉnh sửa tiếp hoặc chọn "Tự Build Từ Bể Trống" để tạo hồ riêng.'
+      );
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -186,6 +217,10 @@ export default function App() {
   useEffect(() => {
     sceneManagerRef.current?.setClickFeedMode(clickFeedMode && activeTab !== 'builder');
   }, [clickFeedMode, activeTab]);
+
+  useEffect(() => {
+    sceneManagerRef.current?.setDockCollapsed(dockCollapsed);
+  }, [dockCollapsed]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -304,7 +339,7 @@ export default function App() {
 
   const handleAddFish = (morph: FishMorphId) => {
     const spec = FISH_CATALOG.find((c) => c.id === morph);
-    if (!spec || state.fishes.length >= 16) return;
+    if (!spec || state.fishes.length >= 24) return;
     const newFish = {
       id: `fish-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       morph,
@@ -324,6 +359,31 @@ export default function App() {
       ...prev,
       fishes: prev.fishes.filter((f) => f.id !== id),
     }));
+  };
+
+  const handleClearAllFishes = () => {
+    setState((prev) => ({ ...prev, fishes: [] }));
+    showToast('Đã vớt toàn bộ cá & tép ra khỏi hồ');
+  };
+
+  const handleCreateFreshTank = () => {
+    setActivePresetId('custom_empty');
+    setSelectedPropId(null);
+    setPlacingPropType('seiryu_rock_large');
+    setState((prev) => ({
+      ...prev,
+      substrate: 'river_sand',
+      lighting: 'wrgb_vivid',
+      waterClarity: 100,
+      fishes: [],
+      props: [],
+      mirrorActive: false,
+    }));
+    setActiveTab('builder');
+    setDockCollapsed(false);
+    setActiveCamera('angle');
+    sceneManagerRef.current?.setCameraPreset('angle');
+    showToast('Đã tạo một bể mới hoàn toàn trống! Hãy chọn nền, xếp đá lũa và thả cá/tép theo ý bạn.');
   };
 
   const handleApplyPresetLayout = (presetId: PresetLayoutId) => {
@@ -503,7 +563,7 @@ export default function App() {
       {toastMessage && (
         <div
           role="status"
-          className="fixed top-16 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-lg bg-[#0d1619]/95 border border-white/12 text-xs font-medium text-teal-200 shadow-lg pointer-events-none whitespace-nowrap"
+          className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-30 max-w-[92vw] px-3.5 sm:px-4 py-2 rounded-lg bg-[#0d1619]/95 border border-white/12 text-xs font-medium text-teal-200 text-center leading-snug shadow-lg pointer-events-none"
         >
           {toastMessage}
         </div>
@@ -527,6 +587,7 @@ export default function App() {
         onToggleMirror={handleToggleMirror}
         onAddFish={handleAddFish}
         onRemoveFish={handleRemoveFish}
+        onClearAllFishes={handleClearAllFishes}
         onApplyPresetLayout={handleApplyPresetLayout}
         onStartEmptyDIY={handleStartEmptyDIY}
         onChangeSubstrate={handleChangeSubstrate}
@@ -575,6 +636,7 @@ export default function App() {
           setState({ ...imported, mirrorActive: false });
           showToast('Đã nạp thành công hồ thủy sinh được chia sẻ!');
         }}
+        onCreateFreshTank={handleCreateFreshTank}
         onCaptureSnapshot={() => sceneManagerRef.current?.captureSnapshot() || null}
       />
     </main>
