@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BottomDock } from './components/BottomDock';
+import { GlbModelModal } from './components/GlbModelModal';
 import { ShareModal } from './components/ShareModal';
 import { DockTab, TopBar } from './components/TopBar';
 import { AquariumSceneManager } from './three/AquariumSceneManager';
@@ -74,6 +75,7 @@ export default function App() {
   const [placingPropType, setPlacingPropType] = useState<AquascapePropType | null>(null);
   const [waterChanging, setWaterChanging] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [glbModalOpen, setGlbModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [audioMix, setAudioMix] = useState<AudioMixState>({
@@ -552,6 +554,14 @@ export default function App() {
         }}
         activeCamera={activeCamera}
         onSelectCamera={handleSelectCamera}
+        onOpenGlbModal={() => setGlbModalOpen(true)}
+      />
+
+      {/* Custom 3D .GLB Model Loader & GitHub Manifest Guide Modal */}
+      <GlbModelModal
+        open={glbModalOpen}
+        onClose={() => setGlbModalOpen(false)}
+        onNotify={showToast}
       />
 
       {/* Share & Snapshot Modal */}

@@ -16,6 +16,7 @@ import {
   CopyPlus,
   Eraser,
   MousePointerClick,
+  Box,
 } from 'lucide-react';
 import {
   AquariumState,
@@ -71,6 +72,7 @@ interface BottomDockProps {
   onResetPomodoro: () => void;
   activeCamera: CameraPreset;
   onSelectCamera: (preset: CameraPreset) => void;
+  onOpenGlbModal: () => void;
 }
 
 const FOOD_OPTIONS: Array<{ id: FoodType; label: string; desc: string }> = [
@@ -131,6 +133,7 @@ export function BottomDock({
   onResetPomodoro,
   activeCamera,
   onSelectCamera,
+  onOpenGlbModal,
 }: BottomDockProps) {
   const [propFilter, setPropFilter] = useState<'all' | 'hardscape' | 'plant' | 'botanical'>('all');
 
@@ -260,6 +263,16 @@ export function BottomDock({
               </span>
               <span>{state.fishes.length} cá</span>
             </div>
+
+            <button
+              type="button"
+              onClick={onOpenGlbModal}
+              title="Nạp mô hình 3D .GLB cho cá, đá, lũa, cây"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-400/15 hover:bg-teal-400/25 border border-teal-400/35 text-teal-200 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <Box className="w-3.5 h-3.5 text-teal-300" />
+              <span className="text-xs font-medium">Model .GLB</span>
+            </button>
 
             <button
               type="button"
@@ -551,11 +564,20 @@ export function BottomDock({
               <span>
                 Bấm chọn dòng cá Betta hoặc Guppy để thả thêm vào hồ (tối đa 16 cá thể)
               </span>
-              {bettaCount > 1 && (
-                <span className="text-amber-300">
-                  Gợi ý thực tế: Cá Betta trống thường nuôi 1 chú độc tôn mỗi hồ để giữ vây luôn lành lặn
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                {bettaCount > 1 && (
+                  <span className="text-amber-300">
+                    Gợi ý thực tế: Cá Betta trống thường nuôi 1 chú độc tôn mỗi hồ
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={onOpenGlbModal}
+                  className="text-teal-300 hover:text-teal-200 underline underline-offset-2 whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  Thay bằng file cá 3D .GLB riêng →
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
